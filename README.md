@@ -1,79 +1,140 @@
-# 💰 EdgeIQ Competitor Price Intelligence
+# EdgeIQ Competitor Price Intelligence
 
-**Monitor competitor pricing and market positioning automatically.**
+Monitor public competitor product pages and generate simple price-change reports.
 
-Track competitor pricing changes across multiple domains, get alerted to price shifts, and maintain competitive intelligence — all automated on a schedule you define.
+## What it does
 
-[![Project Stage](https://img.shields.io/badge/Stage-Beta-blue)](https://edgeiqlabs.com)
-[![Python](https://img.shields.io/badge/Python-3.8+-green)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-orange)](LICENSE)
+- Fetch one or more public product URLs
+- Extract title, price, currency, and availability when detectable
+- Store prior snapshots in a local JSON state file
+- Detect price, availability, and major title/listing changes
+- Output console text, JSON, and HTML reports
+- Send concise alerts through Telegram Bot API and Twilio WhatsApp if configured
 
----
+## Guardrails
 
-## What It Does
+Use this only for:
 
-Scrapes competitor pricing pages at configurable intervals, records price history, and alerts you when prices change. Designed for e-commerce operators, SaaS pricing analysts, and business intelligence teams.
+- Publicly accessible pages, or
+- Pages you are explicitly authorized to monitor
 
----
+Do **not** use it to bypass logins, CAPTCHAs, paywalls, or anti-bot controls.
 
-## Key Features
-
-- **Multi-domain price tracking** — monitor any number of competitor domains
-- **Scheduled scraping** — run on cron or manual trigger
-- **Price change alerts** — Slack/Telegram notification when prices shift
-- **Price history** — SQLite-backed historical record
-- **Product matching** — map competitor products to your catalog
-- **JSON/CSV export** — structured data for BI tools
-
----
-
-## Prerequisites
-
-- Python 3.8+
-- `requests`, `beautifulsoup4`, `lxml`
-
----
-
-## Installation
+## Quick start
 
 ```bash
-git clone https://github.com/snipercat69/edgeiq-competitor-price-intelligence.git
-cd edgeiq-competitor-price-intelligence
-pip install -r requirements.txt
-cp config.json.example config.json
+cd /home/guy/.openclaw/workspace/apps/edgeiq-competitor-price-intelligence
+cp .env.example .env
+python3 scripts/price_monitor.py \
+  "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html" \
+  --state-file ./state/demo-state.json \
+  --json-out ./out/report.json \
+  --html-out ./out/report.html \
+  --text-out ./out/report.txt
 ```
 
----
+## Watchlist formats
 
-## Quick Start
+### Plain text
+
+One URL per line:
+
+```txt
+https://example.com/product/sku-1
+https://example.com/product/sku-2
+```
+
+### JSON
+
+```json
+{
+  "targets": [
+    {"url": "https://example.com/product/sku-1", "label": "Competitor A"},
+    {"url": "https://example.com/product/sku-2", "label": "Competitor B"}
+  ]
+}
+```
+
+### JSONL
+
+```jsonl
+{"url":"https://example.com/product/sku-1","label":"Competitor A"}
+{"url":"https://example.com/product/sku-2","label":"Competitor B"}
+```
+
+### CSV
+
+```csv
+url,label
+https://example.com/product/sku-1,Competitor A
+https://example.com/product/sku-2,Competitor B
+```
+
+## CLI usage
 
 ```bash
-# Run a price check
-python3 scripts/price_check.py
-
-# Check specific domain
-python3 scripts/price_check.py --domain competitor.com
-
-# Export price history
-python3 scripts/export_prices.py --format csv --output price_history.csv
+python3 scripts/price_monitor.py [URL ...] [options]
 ```
 
----
+Options:
 
-## Pricing
+- `--watchlist PATH` - load URLs from `.json`, `.jsonl`, `.csv`, `.tsv`, or text file
+- `--state-file PATH` - snapshot state store (default `./state/price-monitor-state.json`)
+- `--json-out PATH` - write machine-readable report
+- `--html-out PATH` - write HTML report
+- `--text-out PATH` - write plain-text report
+- `--env-file PATH` - optional env file to load (default `.env`)
+- `--dry-run` - fetch and compare without persisting state or sending alerts
+- `--no-alerts` - suppress Telegram and WhatsApp delivery
+- `--fail-on-fetch-error` - exit non-zero if any target fetch fails
+- `--timeout SECONDS` - override HTTP timeout
+- `--user-agent STRING` - override request user-agent
 
-| Tier | Price | Features |
-|------|-------|----------|
-| **Free** | $0 | 3 domains, daily checks |
-| **Pro** | $20/mo | Unlimited domains, hourly checks, CSV export |
-| **Lifetime** | $100 one-time | All Pro features, forever |
+## Example cron-friendly run
 
----
+```bash
+cd /home/guy/.openclaw/workspace/apps/edgeiq-competitor-price-intelligence && \
+python3 scripts/price_monitor.py \
+  --watchlist ./watchlists/sample-watchlist.json \
+  --state-file ./state/prod.json \
+  --json-out ./out/latest.json \
+  --html-out ./out/latest.html \
+  --text-out ./out/latest.txt
+```
 
-## Support
+## Alerts
 
-Open an issue at: https://github.com/snipercat69/edgeiq-competitor-price-intelligence/issues
+When credentials are configured, alerts include:
 
----
+- Product name
+- Old price
+- New price
+- Percent change
+- Availability
+- Source URL
 
-*Part of EdgeIQ Labs — [edgeiqlabs.com](https://edgeiqlabs.com)*
+Telegram uses the Bot API.
+WhatsApp uses Twilio-style messaging credentials.
+
+## Notes on extraction
+
+The monitor tries multiple public-page patterns:
+
+- JSON-LD / schema.org product data
+- OpenGraph and other meta tags
+- Common inline JSON fields
+- Common HTML price class/id patterns
+- Generic text fallback for visible currency amounts
+
+It is intentionally lightweight and stdlib-first, so results will vary across heavily scripted storefronts.
+
+## Sample output
+
+```text
+EdgeIQ competitor price intelligence report (1 target(s))
+- A Light in the Attic
+  URL: https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html
+  Price: GBP 51.77
+  Availability: In Stock
+  Change: first observation
+```
